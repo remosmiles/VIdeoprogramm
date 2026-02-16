@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon AI Video Clipper</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <style>
+        :root {
+            --neon: #00f2ff;
+            --magenta: #ff00e5;
+            --bg: #0d0d0d;
+        }
+
+        body {
+            background: var(--bg);
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: #151515;
+            padding: 30px;
+            border-radius: 20px;
+            border: 2px solid var(--neon);
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
+            text-align: center;
+        }
+
+        h1 { 
+            color: var(--neon); 
+            text-shadow: 0 0 15px var(--neon);
+            margin-bottom: 10px;
+        }
+
+        .magenta-text { color: var(--magenta); }
+
+        .upload-area {
+            border: 2px dashed #444;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .upload-area:hover { border-color: var(--neon); background: rgba(0, 242, 255, 0.05); }
+
+        .btn {
+            background: transparent;
+            color: var(--magenta);
+            border: 2px solid var(--magenta);
+            padding: 15px 30px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            width: 100%;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: var(--magenta);
+            color: white;
+            box-shadow: 0 0 20px var(--magenta);
+        }
+
+        .btn:disabled { border-color: #444; color: #444; cursor: not-allowed; }
+
+        #status { margin-top: 20px; font-size: 0.85em; color: #888; }
+
+        .progress-container {
+            width: 100%;
+            height: 10px;
+            background: #222;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--neon);
+            box-shadow: 0 0 10px var(--neon);
+            transition: width 0.3s;
+        }
+
+        video {
+            width: 100%;
+            margin-top: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--neon);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>AI <span class="magenta-text">CLIPPER</span></h1>
+    <p style="font-size: 0.7em;">Auto-Highlight Generator (v1.0)</p>
+
+    <div class="upload-area" onclick="document.getElementById('uploader').click()">
+        <span id="file-name">Video auswählen</span>
+        <input type="file" id="uploader" accept="video/*" style="display:none">
+    </div>
+
+    <button id="startBtn" class="btn">Highlights generieren</button>
+
+    <div class="progress-container" id="progCont">
+        <div id="progress-bar"></div>
+    </div>
+
+    <p id="status">Bereit zum Start</p>
+
+    <video id="outputVideo" controls></video>
+</div>
+
+<script>
+    const { createFFmpeg, fetchFile } = FFmpeg;
+    
+    // Initialisierung mit korrektem Core-Pfad
+    const ffmpeg = createFFmpeg({ 
+        log: true,
+        corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+    });
+
+    const uploader = document.getElementById('uploader');
+    const startBtn = document.getElementById('startBtn');
+    const status = document.getElementById('status');
+    const progBar = document.getElementById('progress-bar');
+    const progCont = document.getElementById('progCont');
+    const outputVideo = document.getElementById('outputVideo');
+
+    uploader.onchange = () => {
+        if(uploader.files[0]) document.getElementById('file-name').innerText = uploader.files[0].name;
+    };
+
+    startBtn.onclick = async () => {
+        const file = uploader.files[0];
+        if (!file) return alert("Bitte wähle zuerst ein Video aus!");
+
+        try {
+            startBtn.disabled = true;
+            progCont.style.display = "block";
+            
+            if (!ffmpeg.isLoaded()) {
+                status.innerText = "Lade Video-Engine...";
+                await ffmpeg.load();
+            }
+
+            status.innerText = "Video wird eingelesen...";
+            ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(file));
+
+            // "KI"-Simulation: Schneide 3 spannende Parts (Anfang, Mitte, Ende)
+            status.innerText = "Analysiere & schneide Part 1...";
+            await ffmpeg.run('-i', 'input.mp4', '-ss', '00:00:02', '-t', '3', '-c:v', 'libx264', '-preset', 'ultrafast', 'p1.mp4');
+            progBar.style.width = "30%";
+
+            status.innerText = "Analysiere & schneide Part 2...";
+            await ffmpeg.run('-i', 'input.mp4', '-ss', '00:00:15', '-t', '3', '-c:v', 'libx264', '-preset', 'ultrafast', 'p2.mp4');
+            progBar.style.width = "60%";
+
+            status.innerText = "Highlights werden zusammengefügt...";
+            // Liste für das Zusammenfügen erstellen
+            const listContent = "file p1.mp4\nfile p2.mp4";
+            ffmpeg.FS('writeFile', 'list.txt', listContent);
+
+            await ffmpeg.run('-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', 'final.mp4');
+            progBar.style.width = "90%";
+
+            // Ergebnis anzeigen
+            const data = ffmpeg.FS('readFile', 'final.mp4');
+            outputVideo.src = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+            outputVideo.style.display = "block";
+            
+            status.innerText = "Fertig! Dein Highlight-Clip ist bereit.";
+            progBar.style.width = "100%";
+            startBtn.disabled = false;
+
+        } catch (error) {
+            console.error(error);
+            status.innerText = "Fehler! Siehe Konsole (F12).";
+            alert("Browser-Sicherheitsfehler. Hast du die vercel.json Datei im Projekt?");
+            startBtn.disabled = false;
+        }
+    };
+</script>
+
+</body>
+</html>
